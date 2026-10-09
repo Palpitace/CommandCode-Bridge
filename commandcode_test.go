@@ -291,15 +291,28 @@ func TestExecutorStreamEmitsAndClosesBothStreams(t *testing.T) {
 		}
 	}
 	script.mu.Unlock()
-	if len(payloads) < 2 {
+	if len(payloads) != 2 {
 		t.Fatalf("emit calls = %#v", script.calls)
 	}
+	var wire strings.Builder
 	for _, payload := range payloads {
 		if bytes.HasPrefix(payload, []byte("data:")) {
 			t.Fatalf("host stream emit payload must be raw JSON, got %q", payload)
 		}
 		if !json.Valid(payload) {
 			t.Fatalf("host stream emit payload must be JSON, got %q", payload)
+		}
+		wire.WriteString("data: ")
+		wire.Write(payload)
+		wire.WriteString("\n\n")
+	}
+	wire.WriteString("data: [DONE]\n\n")
+	if strings.Contains(wire.String(), "data: data:") || strings.Count(wire.String(), "[DONE]") != 1 {
+		t.Fatalf("invalid host-framed SSE response: %s", wire.String())
+	}
+	for _, want := range []string{`"content":"hi"`, `"role":"assistant"`, `"finish_reason":"stop"`} {
+		if !strings.Contains(wire.String(), want) {
+			t.Fatalf("missing %s in host-framed SSE response: %s", want, wire.String())
 		}
 	}
 	closeRequest := firstCall(t, script, pluginabi.MethodHostStreamClose).Request.(hostStreamCloseRequest)

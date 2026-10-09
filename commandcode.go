@@ -232,6 +232,7 @@ func runExecutorStreamWorker(request executorRPCRequest, upstream *upstreamHTTPS
 }
 
 func emitDownstream(streamID string, payload []byte) error {
+	// CPA owns SSE framing and emits [DONE] when the host stream closes.
 	payload = bytes.TrimSpace(payload)
 	if bytes.Equal(payload, []byte("data: [DONE]")) {
 		return nil
